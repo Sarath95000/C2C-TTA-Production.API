@@ -1,0 +1,6 @@
+@TTA_API_HostAddress = http://localhost:5277
+
+GET {{TTA_API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
