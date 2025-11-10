@@ -57,34 +57,32 @@ namespace TTA_API.Services
         }
 
 
-        public async Task<IEnumerable<AllocationDto>> GenerateAllocationsAsync()
+        // Your updated service method
+        public async Task<IEnumerable<AllocationDto>> GenerateAllocationsAsync(int year, int month)
         {
-            var settings = await _context.SystemSettings.FindAsync(1);
-            var today = DateTime.UtcNow;
+            // The old logic for calculating targetMonth and targetYear from the current date is removed.
+            // We now use the parameters directly.
+            int targetYear = year;
+            // The month from the request is 1-based (Jan=1). The database stores it as 0-based (Jan=0).
+            // We adjust it here for all queries against the Plan entity.
+            int targetMonth = month;
 
-            // This part remains unchanged: determines the target month and year for allocation.
-            int targetMonth = settings.AllocateForCurrentMonth ? today.Month - 1 : today.Month;
-            int targetYear = today.Year;
-            if (!settings.AllocateForCurrentMonth && today.Month == 12)
-            {
-                targetMonth = 0; // The plan's month is 0-indexed, so 0 is January
-                targetYear++;
-            }
+            var settings = await _context.SystemSettings.FindAsync(1);
 
             var plansForMonth = await _context.Plans
                 .Include(p => p.User)
                 .Include(p => p.SelectedDays)
+                // Use the parameters in the query
                 .Where(p => p.Year == targetYear && p.Month == targetMonth)
                 .ToListAsync();
 
             var allUniqueDays = plansForMonth
                 .SelectMany(p => p.SelectedDays.Select(d => d.Day))
                 .Distinct()
-                .Select(day => new DateTime(targetYear, targetMonth + 1, day, 0, 0, 0, DateTimeKind.Utc))
+                // The DateTime constructor correctly uses a 1-based month, so we use the original 'month' parameter.
+                .Select(day => new DateTime(targetYear, month, day, 0, 0, 0, DateTimeKind.Utc))
                 .ToList();
 
-            // MODIFICATION: Sort days chronologically. This provides a more natural and predictable
-            // allocation order compared to sorting by the number of travelers.
             var allDaysToAllocate = allUniqueDays.OrderBy(d => d.Day).ToList();
 
             var existingAllocationsCount = await _context.Allocations
@@ -94,22 +92,15 @@ namespace TTA_API.Services
 
             var newAllocations = new List<TTA_API.Models.Allocation>();
 
-            // --- NEW LOGIC: Setup for Fair Round-Robin Allocation ---
-            // 1. Get a distinct list of all users who have submitted a plan for the month.
-            //    These are the only users eligible to be a booker.
             var eligibleBookers = plansForMonth
                 .Select(p => p.User)
-                .DistinctBy(u => u.Id) // Using DistinctBy to ensure each user appears only once.
+                .DistinctBy(u => u.Id)
                 .ToList();
 
-            // 2. Shuffle this master list of bookers randomly. This is crucial for fairness,
-            //    as it ensures the starting point of the cycle is not based on user ID or name.
             var random = new Random();
             eligibleBookers = eligibleBookers.OrderBy(u => random.Next()).ToList();
 
-            // 3. This index will track the last person in our shuffled list who was assigned a booking.
             int lastBookerIndex = -1;
-            // --- END OF NEW SETUP ---
 
             foreach (var date in allDaysToAllocate)
             {
@@ -120,38 +111,45 @@ namespace TTA_API.Services
 
                 if (!availableUsers.Any()) continue;
 
-                // --- REVISED: Round-Robin Booker Selection Logic ---
-                // This block replaces the previous LINQ query that used alphabetical sorting.
-                User booker = null;
-                if (eligibleBookers.Any())
-                {
-                    // We'll loop through our entire master list of bookers to find one who is available today.
-                    for (int i = 0; i < eligibleBookers.Count; i++)
-                    {
-                        // Start searching from the person *after* the last one who booked.
-                        // The modulo operator (%) ensures the search wraps around to the beginning of the list.
-                        int potentialBookerIndex = (lastBookerIndex + 1 + i) % eligibleBookers.Count;
-                        var potentialBooker = eligibleBookers[potentialBookerIndex];
+                User booker;
 
-                        // Check if this person from our master list is actually available on the current date.
-                        if (availableUsers.Any(u => u.Id == potentialBooker.Id))
+                // --- NEW: Prioritize single traveler as their own booker ---
+                if (availableUsers.Count == 1)
+                {
+                    // If there's only one person traveling, they are automatically the booker.
+                    booker = availableUsers.First();
+                }
+                else
+                {
+                    // --- EXISTING: Use Round-Robin for multiple travelers ---
+                    User roundRobinBooker = null;
+                    if (eligibleBookers.Any())
+                    {
+                        // We'll loop through our entire master list of bookers to find one who is available today.
+                        for (int i = 0; i < eligibleBookers.Count; i++)
                         {
-                            booker = potentialBooker;
-                            lastBookerIndex = potentialBookerIndex; // Remember this person's index for the next day's allocation.
-                            break; // We've found our booker, so we can exit the loop.
+                            // Start searching from the person *after* the last one who booked.
+                            // The modulo operator (%) ensures the search wraps around to the beginning of the list.
+                            int potentialBookerIndex = (lastBookerIndex + 1 + i) % eligibleBookers.Count;
+                            var potentialBooker = eligibleBookers[potentialBookerIndex];
+
+                            // Check if this person from our master list is actually available on the current date.
+                            if (availableUsers.Any(u => u.Id == potentialBooker.Id))
+                            {
+                                roundRobinBooker = potentialBooker;
+                                lastBookerIndex = potentialBookerIndex; // Remember this person's index for the next day's allocation.
+                                break; // We've found our booker, so we can exit the loop.
+                            }
                         }
                     }
-                }
 
-                // Fallback: This should rarely be needed, but if the round-robin somehow fails,
-                // we'll revert to picking the available user with the fewest existing bookings.
-                if (booker == null)
-                {
-                    booker = availableUsers
-                       .OrderBy(u => existingAllocationsCount.GetValueOrDefault(u.Id, 0))
-                       .First();
+                    // Fallback: This should rarely be needed, but if the round-robin somehow fails,
+                    // we'll revert to picking the available user with the fewest existing bookings.
+                    booker = roundRobinBooker ?? availableUsers
+                        .OrderBy(u => existingAllocationsCount.GetValueOrDefault(u.Id, 0))
+                        .First();
                 }
-                // --- END OF REVISED LOGIC ---
+                // --- END OF LOGIC CHANGE ---
 
                 // --- REVISED: Trip Type Logic ---
                 // The trip type is now determined by the day of the week using our new helper method.
@@ -170,14 +168,16 @@ namespace TTA_API.Services
                 existingAllocationsCount[booker.Id] = existingAllocationsCount.GetValueOrDefault(booker.Id, 0) + 1;
             }
 
-            // This part remains unchanged: clears old allocations and saves the new ones.
+            // Clear previous allocations for the selected month and year before adding new ones.
+            // Note: AllocationDate.Month is 1-based, so we use the original 'month' parameter.
             await _context.Allocations
-                .Where(a => a.AllocationDate.Year == targetYear && a.AllocationDate.Month == targetMonth + 1)
+                .Where(a => a.AllocationDate.Year == targetYear && a.AllocationDate.Month == month)
                 .ExecuteDeleteAsync();
 
             _context.Allocations.AddRange(newAllocations);
             await _context.SaveChangesAsync();
 
+            // Reset the "has updated" flag for the correct plans.
             var plansToReset = await _context.Plans
                 .Where(p => p.Year == targetYear && p.Month == targetMonth)
                 .ToListAsync();
@@ -188,7 +188,7 @@ namespace TTA_API.Services
             }
             await _context.SaveChangesAsync();
 
-            await new EmailService(_context).SendEmailAsync();
+            //await new EmailService(_context).SendEmailAsync();
             return await GetAllocationsAsync();
         }
 

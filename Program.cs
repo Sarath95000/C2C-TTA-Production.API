@@ -11,18 +11,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ****************************
 
 // *** STEP 1: DEFINE A CORS POLICY ***
-var myAllowSpecificOrigins = "_myAllowSpecificOrigins";
-
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: myAllowSpecificOrigins,
-                      policy =>
-                      {
-                          // Add the origin of your frontend application here
-                          policy.WithOrigins("http://localhost:3000")
-                                .AllowAnyHeader()
-                                .AllowAnyMethod();
-                      });
+    options.AddPolicy("NetlifyPolicy", policy =>
+    {
+        policy.WithOrigins("https://c2c-tta-app.netlify.app")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // only if you need cookies/auth
+    });
 });
 // **********************************
 
@@ -59,7 +56,7 @@ app.UseHttpsRedirection();
 
 // *** STEP 2: USE THE CORS POLICY ***
 // This MUST be placed after UseHttpsRedirection and before UseAuthorization
-app.UseCors(myAllowSpecificOrigins);
+app.UseCors("NetlifyPolicy");
 // **********************************
 
 app.UseAuthorization();

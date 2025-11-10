@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TTA_API.Models;
 using TTA_API.Services;
 // Add your project's using statements for services and models here
 // using TripPlanner.Api.Services;
@@ -107,12 +108,12 @@ namespace TTA_API.Controllers
             return Ok(allocations);
         }
 
-        [HttpPost("allocations/generate")]
-        public async Task<IActionResult> GenerateAllocations()
-        {
-            var newAllocations = await _allocationService.GenerateAllocationsAsync();
-            return Ok(newAllocations);
-        }
+        //[HttpPost("allocations/generate")]
+        //public async Task<IActionResult> GenerateAllocations()
+        //{
+        //    var newAllocations = await _allocationService.GenerateAllocationsAsync();
+        //    return Ok(newAllocations);
+        //}
 
         // --- System Settings Endpoints ---
 
@@ -151,6 +152,21 @@ namespace TTA_API.Controllers
         {
             var userNames = await _planService.GetUpdatedUserNamesAsync();
             return Ok(userNames);
+        }
+
+        [HttpPost("allocations/generate")]
+        public async Task<ActionResult<IEnumerable<AllocationDto>>> GenerateAllocations([FromBody] GenerateAllocationsRequestDto request)
+        {
+            // Basic validation
+            if (request.Year < 2000 || request.Month < 1 || request.Month > 12)
+            {
+                return BadRequest("Invalid year or month provided.");
+            }
+
+            // Pass the year and month to your service layer
+            var allocations = await _allocationService.GenerateAllocationsAsync(request.Year, request.Month);
+
+            return Ok(allocations);
         }
     }
 
