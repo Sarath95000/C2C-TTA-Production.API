@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TTA_API.Models;
 using TTA_API.Services;
 // Add your project's using statements for services and models here
 // using TripPlanner.Api.Services;
@@ -17,6 +18,7 @@ namespace TTA_API.Controllers
         private readonly IAllocationService _allocationService;
         private readonly ISettingsService _settingsService;
         private readonly IHolidayService _holidayService;
+        private readonly ILoginEvents _loginEvents;
 
         private readonly ILogger<TripPlannerApiController> _logger;
 
@@ -28,7 +30,8 @@ namespace TTA_API.Controllers
             IPlanService planService,
             IAllocationService allocationService,
             ISettingsService settingsService,
-            IHolidayService holidayService
+            IHolidayService holidayService,
+            ILoginEvents loginEvents
             )
         {
             _logger = logger;
@@ -37,6 +40,8 @@ namespace TTA_API.Controllers
             _allocationService = allocationService;
             _settingsService = settingsService;
             _holidayService = holidayService;
+            _loginEvents = loginEvents;
+
         }
 
         // --- User Endpoints ---
@@ -79,6 +84,10 @@ namespace TTA_API.Controllers
             {
                 return Unauthorized(new { message = "Invalid credentials." });
             }
+            else
+            {
+                _loginEvents.CreateLoginEntryAsync(loginDto.Identifier, loginDto.Pin);
+            }
             return Ok(user);
         }
 
@@ -107,12 +116,12 @@ namespace TTA_API.Controllers
             return Ok(allocations);
         }
 
-        [HttpPost("allocations/generate")]
-        public async Task<IActionResult> GenerateAllocations()
-        {
-            var newAllocations = await _allocationService.GenerateAllocationsAsync();
-            return Ok(newAllocations);
-        }
+        //[HttpPost("allocations/generate")]
+        //public async Task<IActionResult> GenerateAllocations()
+        //{
+        //    var newAllocations = await _allocationService.GenerateAllocationsAsync();
+        //    return Ok(newAllocations);
+        //}
 
         // --- System Settings Endpoints ---
 
@@ -151,6 +160,21 @@ namespace TTA_API.Controllers
         {
             var userNames = await _planService.GetUpdatedUserNamesAsync();
             return Ok(userNames);
+        }
+
+        [HttpPost("allocations/generate")]
+        public async Task<ActionResult<IEnumerable<AllocationDto>>> GenerateAllocations([FromBody] GenerateAllocationsRequestDto request)
+        {
+            // Basic validation
+            if (request.Year < 2000 || request.Month < 1 || request.Month > 12)
+            {
+                return BadRequest("Invalid year or month provided.");
+            }
+
+            // Pass the year and month to your service layer
+            var allocations = await _allocationService.GenerateAllocationsAsync(request.Year, request.Month, request.ActorUserId);
+
+            return Ok(allocations);
         }
     }
 

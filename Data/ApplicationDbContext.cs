@@ -15,6 +15,7 @@ namespace TTA_API.Data
         public DbSet<AllocationTraveler> AllocationTravelers { get; set; }
         public DbSet<SystemSettings> SystemSettings { get; set; }
         public DbSet<Holiday> Holidays { get; set; }
+        public DbSet<LoginEvents> LoginEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -46,8 +47,8 @@ namespace TTA_API.Data
 
             // Seed initial users
             modelBuilder.Entity<User>().HasData(
-                new User { Id = 1, Name = "Allocation Admin", Role = Role.AllocationAdmin, Email = "alloc-admin@trip.com", SendEmail = false, Pin = "0000" },
-                new User { Id = 2, Name = "System Admin", Role = Role.SystemAdmin, Email = "sys-admin@trip.com", SendEmail = false, Pin = "0000" }
+                new User { Id = 1, Name = "Allocation Admin", Role = Role.AllocationAdmin, Email = "alloc-admin@trip.com", SendEmail = false, Pin = "5361" },
+                new User { Id = 2, Name = "System Admin", Role = Role.SystemAdmin, Email = "sys-admin@trip.com", SendEmail = false, Pin = "5361" }
                 //new User { Id = 3, Name = "Gayathri", Role = Role.User, Email = "gayathri@trip.com", SendEmail = true, Pin = "1001" },
                 //new User { Id = 4, Name = "Gokul", Role = Role.User, Email = "gokul@trip.com", SendEmail = true, Pin = "1001" },
                 //new User { Id = 5, Name = "Kiruthika", Role = Role.User, Email = "kiruthika@trip.com", SendEmail = true, Pin = "1001" },

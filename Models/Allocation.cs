@@ -22,6 +22,5 @@ namespace TTA_API.Models
         public int CreatedBy { get; set; } // The Admin who ran the allocation
         public DateTime? UpdatedTime { get; set; }
         public int? UpdatedBy { get; set; }
-
     }
 }
