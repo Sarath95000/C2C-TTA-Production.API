@@ -15,6 +15,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("NetlifyPolicy", policy =>
     {
+        //policy.WithOrigins("http://localhost:3000")
         policy.WithOrigins("https://c2c-tta-app.netlify.app")
               .AllowAnyHeader()
               .AllowAnyMethod()
@@ -35,6 +36,7 @@ builder.Services.AddScoped<IAllocationService, AllocationService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ILoginEvents, LoginEventService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

@@ -58,7 +58,7 @@ namespace TTA_API.Services
 
 
         // Your updated service method
-        public async Task<IEnumerable<AllocationDto>> GenerateAllocationsAsync(int year, int month)
+        public async Task<IEnumerable<AllocationDto>> GenerateAllocationsAsync(int year, int month, int actorUserId)
         {
             // The old logic for calculating targetMonth and targetYear from the current date is removed.
             // We now use the parameters directly.
@@ -157,10 +157,12 @@ namespace TTA_API.Services
 
                 var allocation = new TTA_API.Models.Allocation
                 {
+                    CreatedBy = actorUserId,
+                    CreatedTime = DateTime.Now,
                     AllocationDate = date,
                     BookerUserId = booker.Id,
                     TripType = tripType,
-                    Travelers = availableUsers.Select(u => new AllocationTraveler { UserId = u.Id }).ToList()
+                    Travelers = availableUsers.Select(u => new AllocationTraveler { UserId = u.Id }).ToList(),
                 };
 
                 newAllocations.Add(allocation);
@@ -188,7 +190,7 @@ namespace TTA_API.Services
             }
             await _context.SaveChangesAsync();
 
-            //await new EmailService(_context).SendEmailAsync();
+            await new EmailService(_context).SendEmailAsync(false,null,month,year);
             return await GetAllocationsAsync();
         }
 

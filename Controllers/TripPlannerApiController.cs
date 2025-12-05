@@ -18,6 +18,7 @@ namespace TTA_API.Controllers
         private readonly IAllocationService _allocationService;
         private readonly ISettingsService _settingsService;
         private readonly IHolidayService _holidayService;
+        private readonly ILoginEvents _loginEvents;
 
         private readonly ILogger<TripPlannerApiController> _logger;
 
@@ -29,7 +30,8 @@ namespace TTA_API.Controllers
             IPlanService planService,
             IAllocationService allocationService,
             ISettingsService settingsService,
-            IHolidayService holidayService
+            IHolidayService holidayService,
+            ILoginEvents loginEvents
             )
         {
             _logger = logger;
@@ -38,6 +40,8 @@ namespace TTA_API.Controllers
             _allocationService = allocationService;
             _settingsService = settingsService;
             _holidayService = holidayService;
+            _loginEvents = loginEvents;
+
         }
 
         // --- User Endpoints ---
@@ -79,6 +83,10 @@ namespace TTA_API.Controllers
             if (user == null)
             {
                 return Unauthorized(new { message = "Invalid credentials." });
+            }
+            else
+            {
+                _loginEvents.CreateLoginEntryAsync(loginDto.Identifier, loginDto.Pin);
             }
             return Ok(user);
         }
@@ -164,7 +172,7 @@ namespace TTA_API.Controllers
             }
 
             // Pass the year and month to your service layer
-            var allocations = await _allocationService.GenerateAllocationsAsync(request.Year, request.Month);
+            var allocations = await _allocationService.GenerateAllocationsAsync(request.Year, request.Month, request.ActorUserId);
 
             return Ok(allocations);
         }

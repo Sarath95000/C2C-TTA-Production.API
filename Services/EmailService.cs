@@ -33,7 +33,7 @@ namespace TTA_API.Services
              EmailFooterName = configuration["EmailService:EmailFooterName"];
              SiteURL = configuration["EmailService:SiteURL"];
         }
-        public async Task<IEnumerable<TravelSchedules>> SendEmailAsync(bool isForNewUserCreation = false, User newUser= null)
+        public async Task<IEnumerable<TravelSchedules>> SendEmailAsync(bool isForNewUserCreation = false, User newUser= null, int month =default, int year= default)
         {
             if(isForNewUserCreation)
             {
@@ -41,7 +41,7 @@ namespace TTA_API.Services
             }
             else
             {
-                SendEmailAllocationSchedule();
+                SendEmailAllocationSchedule(month,year);
             }
 
             
@@ -182,7 +182,7 @@ namespace TTA_API.Services
             SendEmail(newUser.Email, subject,htmlBody.ToString());
         }
 
-        private void SendEmailAllocationSchedule()
+        private void SendEmailAllocationSchedule(int month, int year)
         {
             var userAllocationIds = _context.AllocationTravelers
                     .Select(at => at.AllocationId)
@@ -202,7 +202,7 @@ namespace TTA_API.Services
 
             // Step 3: Get travel schedule (materialize Allocations too)
             var allocations = _context.Allocations
-                .Where(a => userAllocationIds.Contains(a.Id))
+                .Where(a => userAllocationIds.Contains(a.Id) && a.AllocationDate.Month == month && a.AllocationDate.Year == year)
                 .OrderBy(a => a.AllocationDate)
                 .ToList(); // Materialize before projection
 
@@ -210,6 +210,7 @@ namespace TTA_API.Services
             var travelSchedules = (from a in allocations
                                    join ct in coTravelers on a.Id equals ct.AllocationId into ctGroup
                                    from ct in ctGroup.DefaultIfEmpty()
+                                   where a.Booker != null
                                    select new TravelSchedules
                                    {
                                        TravelDate = a.AllocationDate.ToString("dddd, MMMM d"),
@@ -243,7 +244,8 @@ namespace TTA_API.Services
                 allocationScheduleList.Append("<tr>");
 
                 allocationScheduleList.Append("<td>" + schedule.TravelDate + "</td>");
-                if (schedule.TripType == "Departure" || schedule.TripType.Contains("dep"))
+                //if (schedule.TripType == "Departure" || schedule.TripType.Contains("dep"))
+                if (schedule.TripType == systemSettings.DepartureLabel)
                 {
                     allocationScheduleList.Append("<td><span class=\"badge departure\">");
                     allocationScheduleList.Append(systemSettings.DepartureLabel);
